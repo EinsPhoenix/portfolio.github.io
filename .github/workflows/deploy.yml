@@ -22,7 +22,7 @@ jobs:
 
       - name: Build with base path
         env:
-          BASE_PATH: "/portfolio"
+          BASE_PATH: "/portfolio.github.io"
         run: |
           npm run build
           touch build/.nojekyll
@@ -32,8 +32,9 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: github-pages
-          path: build/
+          name: portfolio.github.io # Correct artifact name
+          path: "build/"
+          retention-days: 1
 
   deploy:
     needs: build
@@ -46,8 +47,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v3
-        with:
-          artifact-name: github-pages # Explicitly specify artifact name
