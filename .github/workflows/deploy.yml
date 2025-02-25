@@ -2,45 +2,45 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: "main"
+    branches: ["main"]
 
 jobs:
-  build_site:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build
+      - name: Build with base path
         env:
           BASE_PATH: "/portfolio"
         run: |
           npm run build
           touch build/.nojekyll
+          # Verify build output
+          ls -la build/
 
-      # Replace the upload-pages-artifact step with a direct upload using the updated action
-      - name: Upload Artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: github-pages
-          path: build/
+          path: "build/"
+          retention-days: 1
 
   deploy:
-    needs: build_site
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
-
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
