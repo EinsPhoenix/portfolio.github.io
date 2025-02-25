@@ -9,30 +9,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 #
 
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build
+      - name: build
         env:
           BASE_PATH: "/portfolio"
         run: |
           npm run build
           touch build/.nojekyll
 
-      # Replace the upload-pages-artifact step with a direct upload using the updated action
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload Artifacts
+        uses: actions/upload-pages-artifact@v2
         with:
-          name: pages-artifact
-          path: build/
+          path: "build/"
 
   deploy:
     needs: build_site
@@ -48,4 +46,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v3
+        uses: actions/deploy-pages@v2
