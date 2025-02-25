@@ -6,11 +6,15 @@ const config = {
     preprocess: vitePreprocess(),
 
     kit: {
-        adapter: adapter(),
+        adapter: adapter({
+          pages: 'build',
+          assets: 'build',
+          fallback: null
+        }),
         paths: {
-            base: process.env.NODE_ENV === 'production' ? '/sveltekit-github-pages' : '',
+          base: process.env.BASE_PATH || '',
         }
-    }
+      }
 };
 
 export default config;
