@@ -1766,7 +1766,7 @@
   .skills-cards-container {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2.5rem;
+    gap: 5rem;
     padding: 2rem;
     max-width: 1200px;
     width: 100%;
