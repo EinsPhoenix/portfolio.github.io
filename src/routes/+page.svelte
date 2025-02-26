@@ -670,8 +670,28 @@
   </div>
 </div>
 
-<!-- Skills Showcase Section (appears after carousel) -->
+<!-- Skills Showcase Section-->
 <div class="skills-showcase" class:visible={skillsShowcaseVisible}>
+  <div class="skills-showcase-background">
+    <div class="binary-rain">
+      {#each Array(30) as _, i}
+        <div
+          class="column"
+          style="--x: {Math.random() * 100}%;
+                    --speed: {15 + Math.random() * 15}s;
+                    --delay: {Math.random() * 5}s;"
+        >
+          {#each Array(35) as _, j}
+            <span class="bit" style="--hue: {Math.random() * 360}">
+              {"01@$%&*#"[Math.floor(Math.random() * 15)]}
+            </span>
+          {/each}
+        </div>
+      {/each}
+    </div>
+  </div>
+
+  <!-- Content -->
   <div class="showcase-header">
     <h2>Key Highlights</h2>
     <p>A glimpse of what I bring to the table</p>
@@ -700,7 +720,7 @@
         <div class="skill-card-front">
           <div class="card-icon">
             <i class="fas fa-handshake"></i>
-            <img src="{base}/consulting.jpeg" alt="Programming Experience" />
+            <img src="{base}/consulting.jpeg" alt="Consulting Experience" />
           </div>
         </div>
         <div class="skill-card-back">
@@ -716,7 +736,7 @@
         <div class="skill-card-front">
           <div class="card-icon">
             <i class="fas fa-server"></i>
-            <img src="{base}/rust_neo4j.png" alt="Programming Experience" />
+            <img src="{base}/rust_neo4j.png" alt="Backend Development" />
           </div>
         </div>
         <div class="skill-card-back">
@@ -746,7 +766,7 @@
     <div class="skill-card">
       <div class="skill-card-inner">
         <div class="skill-card-front">
-          <img src="{base}/project.png" alt="Mixed Reality" />
+          <img src="{base}/project.png" alt="Project Management" />
         </div>
         <div class="skill-card-back">
           <h3>Project</h3>
@@ -759,7 +779,7 @@
     <div class="skill-card">
       <div class="skill-card-inner">
         <div class="skill-card-front">
-          <img src="{base}/english1_2.png" alt="English Language" />
+          <img src="{base}/english1_2.png" alt="English Proficiency" />
         </div>
         <div class="skill-card-back">
           <h3>C1.2 Level</h3>
@@ -769,7 +789,6 @@
     </div>
   </div>
 </div>
-
 <!-- Chat Bubble -->
 <button
   class="chat-bubble"
@@ -1593,21 +1612,119 @@
   }
 
   .skills-showcase {
+    position: relative;
     min-height: 100vh;
-    background: var(--gradient);
     padding: 4rem 2rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+  }
+
+  .skills-showcase-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      45deg,
+      var(--dark) 20%,
+      var(--dark-secondary) 80%
+    );
+    z-index: 0;
+  }
+
+  .binary-rain {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    mix-blend-mode: screen;
+    z-index: 1;
+    pointer-events: none;
+    font-family: "Courier New", monospace;
+  }
+
+  .column {
+    position: absolute;
+    left: var(--x);
+    animation: fall var(--speed) var(--delay) linear infinite;
+    transform: translateY(-100%);
+  }
+
+  .bit {
+    position: relative;
+    color: hsl(var(--hue), 80%, 65%);
+    font-size: 1.4rem;
+    font-weight: 700;
+    opacity: 0.8;
+    text-shadow: 0 0 10px currentColor;
+    line-height: 1.2;
+    display: block;
+    animation:
+      bit-fade 1.5s ease-in-out infinite,
+      glitch 0.3s infinite;
+  }
+
+  @keyframes fall {
+    to {
+      transform: translateY(150vh);
+    }
+  }
+
+  @keyframes bit-fade {
+    0%,
+    100% {
+      opacity: 0.1;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+
+  @keyframes glitch {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-1px);
+    }
+    40% {
+      transform: translateX(2px);
+    }
+    60% {
+      transform: translateX(-1px);
+    }
+    80% {
+      transform: translateX(1px);
+    }
+  }
+
+  /* Mobile Optimierungen */
+  @media (max-width: 768px) {
+    .binary-rain {
+      mix-blend-mode: soft-light;
+    }
+
+    .bit {
+      font-size: 1rem;
+      opacity: 0.6;
+    }
+
+    .column {
+      animation-duration: calc(var(--speed) * 1.2);
+    }
   }
 
   .showcase-header {
+    position: relative;
+    z-index: 2;
     text-align: center;
     margin-bottom: 3rem;
     color: var(--text);
-    position: relative;
-    z-index: 2;
   }
 
   .showcase-header h2 {
@@ -1624,21 +1741,18 @@
     color: var(--text-secondary);
   }
 
-  /* SVG connections */
-  .skills-connections {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-    pointer-events: none;
+  .showcase-header h2 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to right, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
-  .connection-path {
-    stroke-dasharray: 1000;
-    stroke-dashoffset: 1000;
-    animation: flowPath 15s linear infinite;
+  .showcase-header p {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
   }
 
   @keyframes flowPath {
@@ -1860,19 +1974,23 @@
     }
   }
 
-  @media (max-width: 768px) {
-    .skills-cards-container {
-      grid-template-columns: 1fr;
-      max-width: 500px;
-    }
+  .skills-showcase {
+    padding: 4rem 1rem;
+  }
 
-    .skill-card {
-      height: 300px;
-      transform: rotate(0deg) !important;
-    }
+  .showcase-header h2 {
+    font-size: 2rem;
+  }
 
-    .skill-card-inner {
-      transform: none !important;
-    }
+  .showcase-header p {
+    font-size: 1rem;
+  }
+
+  .connections {
+    stroke-width: 0.5;
+  }
+
+  .particle {
+    display: none;
   }
 </style>
