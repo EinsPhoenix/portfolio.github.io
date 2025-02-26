@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { base } from "$app/paths";
+  import type { SvelteHTMLElements } from "svelte/elements";
 
   // Carousel control
   let activeSlide = 0;
   let carouselContainer: HTMLElement;
   let isScrolling = false;
   let carouselActive = true;
+  let skillsShowcaseVisible = false;
 
   // Chat bubble control
   let isChatOpen = false;
@@ -18,7 +20,7 @@
   // Slides for the carousel
   const slides = [
     {
-      title: "Noah Kirsch",
+      title: "About me",
       subtitle: "Developer • Security Enthusiast • Problem Solver",
       content: "profile",
     },
@@ -148,11 +150,6 @@
       title: "Development with C# and Unity 3D",
       icon: "code",
     },
-    {
-      year: "2011",
-      title: "Scout Martin von Tours",
-      icon: "campground",
-    },
   ];
 
   // Projects
@@ -185,13 +182,22 @@
     "Office & Excel Proficiency",
   ];
 
+  // Viewport detection
+  let isMobile = false;
+  let viewportHeight = 0;
+  let safeAreaBottom = 0;
+
+  // Define the scroll threshold and animation flag
+  let skillsShowcaseSection: HTMLElement;
+  let isAnimatingToShowcase = false;
+
   // Handler for mouse wheel
   const handleWheel = (e: WheelEvent) => {
-    if (carouselActive) {
+    if (carouselActive || skillsShowcaseVisible) {
       e.preventDefault();
     }
 
-    if (isScrolling) return;
+    if (isScrolling || isAnimatingToShowcase) return;
     isScrolling = true;
 
     const delta = e.deltaY;
@@ -201,18 +207,41 @@
       if (activeSlide < slides.length - 1) {
         activeSlide++;
       } else if (carouselActive) {
+        // We've reached the end of the carousel, animate to skills showcase
+        isAnimatingToShowcase = true;
         carouselActive = false;
-        window.scrollTo({ top: window.innerHeight, behavior: "smooth" });
+
+        if (skillsShowcaseSection) {
+          skillsShowcaseSection.scrollIntoView({ behavior: "smooth" });
+        } else {
+          window.scrollTo({ top: window.innerHeight, behavior: "smooth" });
+        }
+
         document.body.style.overflow = "auto";
+        skillsShowcaseVisible = true;
+
+        setTimeout(() => {
+          isAnimatingToShowcase = false;
+        }, 1000);
       }
     } else if (delta < 0) {
       // Scroll up
-      if (window.scrollY > 0 && window.scrollY < window.innerHeight) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        carouselActive = true;
-        document.body.style.overflow = "hidden";
-      } else if (carouselActive && activeSlide > 0) {
-        activeSlide--;
+      if (carouselActive) {
+        if (window.scrollY > 0 && window.scrollY < window.innerHeight) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          carouselActive = true;
+          document.body.style.overflow = "hidden";
+        } else if (activeSlide > 0) {
+          activeSlide--;
+        }
+      } else {
+        if (window.scrollY <= window.innerHeight + 50) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          carouselActive = true;
+          skillsShowcaseVisible = false;
+          document.body.style.overflow = "hidden";
+          e.preventDefault();
+        }
       }
     }
 
@@ -226,6 +255,65 @@
         document.body.style.overflow = "auto";
       }
     }, 800);
+  };
+
+  let touchStartY = 0;
+  let touchStartX = 0;
+
+  const handleTouchStart = (e: TouchEvent) => {
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!carouselActive || isScrolling || isAnimatingToShowcase) return;
+
+    const touchY = e.touches[0].clientY;
+    const touchX = e.touches[0].clientX;
+
+    const diffY = touchStartY - touchY;
+    const diffX = touchStartX - touchX;
+
+    if (Math.abs(diffY) > Math.abs(diffX)) {
+      e.preventDefault();
+
+      if (diffY > 50) {
+        // Swipe up
+        if (activeSlide < slides.length - 1) {
+          activeSlide++;
+          isScrolling = true;
+          setTimeout(() => {
+            isScrolling = false;
+          }, 800);
+        } else {
+          // Last slide - show skills showcase
+          isAnimatingToShowcase = true;
+          carouselActive = false;
+
+          if (skillsShowcaseSection) {
+            skillsShowcaseSection.scrollIntoView({ behavior: "smooth" });
+          } else {
+            window.scrollTo({ top: window.innerHeight, behavior: "smooth" });
+          }
+
+          document.body.style.overflow = "auto";
+          skillsShowcaseVisible = true;
+
+          setTimeout(() => {
+            isAnimatingToShowcase = false;
+          }, 1000);
+        }
+      } else if (diffY < -50) {
+        // Swipe down
+        if (activeSlide > 0) {
+          activeSlide--;
+          isScrolling = true;
+          setTimeout(() => {
+            isScrolling = false;
+          }, 800);
+        }
+      }
+    }
   };
 
   const animateContent = () => {
@@ -246,6 +334,23 @@
   const nextSlide = () => {
     if (activeSlide < slides.length - 1) {
       activeSlide++;
+    } else {
+      // Last slide - show skills showcase on next button
+      isAnimatingToShowcase = true;
+      carouselActive = false;
+
+      if (skillsShowcaseSection) {
+        skillsShowcaseSection.scrollIntoView({ behavior: "smooth" });
+      } else {
+        window.scrollTo({ top: window.innerHeight, behavior: "smooth" });
+      }
+
+      document.body.style.overflow = "auto";
+      skillsShowcaseVisible = true;
+
+      setTimeout(() => {
+        isAnimatingToShowcase = false;
+      }, 1000);
     }
   };
 
@@ -259,26 +364,107 @@
     window.open("https://www.linkedin.com/in/noah-kirsch-4bb2112b0/", "_blank");
   };
 
+  const checkViewport = () => {
+    isMobile = window.innerWidth <= 768;
+    viewportHeight = window.innerHeight;
+
+    safeAreaBottom = 0;
+    if (
+      window.CSS &&
+      CSS.supports("padding-bottom: env(safe-area-inset-bottom)")
+    ) {
+      const computedStyle = getComputedStyle(document.documentElement);
+      const safeAreaValue = computedStyle
+        .getPropertyValue("--safe-area-inset-bottom")
+        .trim();
+      if (safeAreaValue) {
+        safeAreaBottom = parseInt(safeAreaValue, 10) || 0;
+      }
+    }
+  };
+
   onMount(() => {
     if (carouselContainer) {
       window.addEventListener("wheel", handleWheel, { passive: false });
+      window.addEventListener("touchstart", handleTouchStart, {
+        passive: true,
+      });
+      window.addEventListener("touchmove", handleTouchMove, { passive: false });
+      window.addEventListener("resize", checkViewport);
       document.body.style.overflow = "hidden";
 
+      // Get reference to skills showcase section
+      skillsShowcaseSection = document.querySelector(
+        ".skills-showcase"
+      ) as HTMLElement;
+
+      checkViewport();
       animateContent();
+
+      function updateVhVariable() {
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty("--vh", `${vh}px`);
+      }
+
+      updateVhVariable();
+
+      window.addEventListener("resize", updateVhVariable);
+
+      // Add scroll event listener to handle returning to carousel
+      window.addEventListener("scroll", () => {
+        if (window.scrollY < 50 && !carouselActive) {
+          carouselActive = true;
+          document.body.style.overflow = "hidden";
+        }
+      });
 
       return () => {
         window.removeEventListener("wheel", handleWheel);
+        window.removeEventListener("touchstart", handleTouchStart);
+        window.removeEventListener("touchmove", handleTouchMove);
+        window.removeEventListener("resize", checkViewport);
+        window.removeEventListener("resize", updateVhVariable);
+        window.removeEventListener("scroll", () => {});
         document.body.style.overflow = "auto";
       };
+    } else {
+      window.addEventListener("resize", initializeSkillCards);
+      if (skillsShowcaseVisible) {
+        initializeSkillCards();
+      }
     }
   });
+
+  function initializeSkillCards() {
+    const skillCards = document.querySelectorAll(".skill-card");
+    const container = document.querySelector(
+      ".skills-cards-container"
+    ) as HTMLElement;
+
+    skillCards.forEach((card) => {
+      const cardElement = card as HTMLElement;
+      const randomRotate = Math.random() * 8 - 4;
+      const randomOffset = Math.random() * 20 - 10;
+
+      cardElement.style.transform = `rotate(${randomRotate}deg) translate(${randomOffset}px, ${randomOffset}px)`;
+    });
+  }
+
+  $: if (skillsShowcaseVisible) {
+    initializeSkillCards();
+  }
 
   $: if (typeof activeSlide !== "undefined") {
     animateContent();
   }
+  $: if (skillsShowcaseVisible) {
+    setTimeout(() => {
+      initializeSkillCards();
+      window.dispatchEvent(new Event("resize"));
+    }, 300);
+  }
 </script>
 
-<!-- Main carousel -->
 <div class="carousel" bind:this={carouselContainer}>
   <div class="slides" style="transform: translateX(-{activeSlide * 100}%)">
     {#each slides as slide, i}
@@ -476,6 +662,112 @@
   >
     <i class="fas fa-chevron-right"></i>
   </button>
+
+  <!-- Scroll Hint -->
+  <div class="scroll-hint" class:visible={activeSlide === slides.length - 1}>
+    <span>Scroll down for more</span>
+    <i class="fas fa-chevron-down"></i>
+  </div>
+</div>
+
+<!-- Skills Showcase Section (appears after carousel) -->
+<div class="skills-showcase" class:visible={skillsShowcaseVisible}>
+  <div class="showcase-header">
+    <h2>Key Highlights</h2>
+    <p>A glimpse of what I bring to the table</p>
+  </div>
+
+  <div class="skills-cards-container">
+    <!-- Card 1 -->
+    <div class="skill-card">
+      <div class="skill-card-inner">
+        <div class="skill-card-front">
+          <div class="card-icon">
+            <i class="fas fa-code"></i>
+            <img src="{base}/coding.png" alt="Programming Experience" />
+          </div>
+        </div>
+        <div class="skill-card-back">
+          <h3>9+ Years</h3>
+          <p>Programming Experience</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="skill-card">
+      <div class="skill-card-inner">
+        <div class="skill-card-front">
+          <div class="card-icon">
+            <i class="fas fa-handshake"></i>
+            <img src="{base}/consulting.jpeg" alt="Programming Experience" />
+          </div>
+        </div>
+        <div class="skill-card-back">
+          <h3>Consulting</h3>
+          <p>Experience</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="skill-card">
+      <div class="skill-card-inner">
+        <div class="skill-card-front">
+          <div class="card-icon">
+            <i class="fas fa-server"></i>
+            <img src="{base}/rust_neo4j.png" alt="Programming Experience" />
+          </div>
+        </div>
+        <div class="skill-card-back">
+          <h3>Backend</h3>
+          <p>Developer</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4 -->
+    <div class="skill-card">
+      <div class="skill-card-inner">
+        <div class="skill-card-front">
+          <div class="card-icon">
+            <i class="fas fa-vr-cardboard"></i>
+            <img src="{base}/mixed_reality.jpg" alt="Mixed Reality" />
+          </div>
+        </div>
+        <div class="skill-card-back">
+          <h3>Mixed Reality</h3>
+          <p>Developer</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 5 -->
+    <div class="skill-card">
+      <div class="skill-card-inner">
+        <div class="skill-card-front">
+          <img src="{base}/project.png" alt="Mixed Reality" />
+        </div>
+        <div class="skill-card-back">
+          <h3>Project</h3>
+          <p>Management Experience</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 6 -->
+    <div class="skill-card">
+      <div class="skill-card-inner">
+        <div class="skill-card-front">
+          <img src="{base}/english1_2.png" alt="English Language" />
+        </div>
+        <div class="skill-card-back">
+          <h3>C1.2 Level</h3>
+          <p>English Proficiency</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Chat Bubble -->
@@ -522,12 +814,15 @@
     --card-bg: rgba(30, 30, 36, 0.9);
     --gradient: linear-gradient(135deg, #2d2d40, #181825);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    --vh: 1vh;
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   /* Carousel Styles */
   .carousel {
     width: 100%;
     height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
     position: relative;
     overflow: hidden;
     background-color: var(--dark);
@@ -542,6 +837,7 @@
   .slide {
     flex: 0 0 100%;
     height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
     position: relative;
     overflow: hidden;
   }
@@ -585,6 +881,8 @@
     padding: 2rem;
     color: var(--text);
     text-align: center;
+
+    padding-bottom: calc(2rem + var(--safe-area-inset-bottom) + 30px);
   }
 
   .slide-title {
@@ -593,8 +891,12 @@
     opacity: 0;
     transform: translateY(20px);
     animation: fadeUp 0.8s forwards;
-    color: var(--text);
     font-weight: 700;
+
+    /* Gradient as text color */
+    background-image: linear-gradient(to right, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    color: transparent;
   }
 
   .slide-subtitle {
@@ -612,16 +914,36 @@
     padding: 2rem;
     border-radius: 15px;
     box-shadow: var(--shadow);
-    max-width: 800px;
+    max-width: 850px;
     width: 90%;
+    max-height: 70vh;
+    max-height: calc(var(--vh, 2vh) * 70);
     color: var(--text);
     transition: all 0.3s ease;
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary) var(--dark-tertiary);
     opacity: 0;
     transform: translateY(20px);
     animation: fadeUp 0.8s 0.4s forwards;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    bottom: 5px;
+  }
+
+  /* Styling for scrollbars */
+  .card::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .card::-webkit-scrollbar-track {
+    background: var(--dark-tertiary);
+    border-radius: 10px;
+  }
+
+  .card::-webkit-scrollbar-thumb {
+    background-color: var(--primary);
+    border-radius: 10px;
   }
 
   .card:hover {
@@ -780,7 +1102,7 @@
   .skill-category-title {
     font-size: 1.2rem;
     margin-bottom: 1rem;
-    color: var(--secondary);
+    color: var(--accent);
     border-bottom: 2px solid rgba(32, 201, 151, 0.3);
     padding-bottom: 0.5rem;
   }
@@ -853,14 +1175,16 @@
 
   .timeline-period {
     font-weight: bold;
-    color: var(--secondary);
-    margin-bottom: 0.5rem;
+    color: var(--accent);
+    margin-bottom: 0.3rem;
+    font-size: 1.1rem;
   }
 
   .timeline-title {
-    font-size: 1.3rem;
-    margin-bottom: 0.5rem;
+    font-weight: 600;
     color: var(--text);
+    margin-bottom: 0.5rem;
+    font-size: 1.3rem;
   }
 
   .timeline-description {
@@ -868,82 +1192,61 @@
     line-height: 1.6;
   }
 
+  /* Activities Section */
   .section-subtitle {
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
     color: var(--secondary);
-    margin: 1.5rem 0;
-    font-size: 1.5rem;
-    position: relative;
-    display: inline-block;
-  }
-
-  .section-subtitle::after {
-    content: "";
-    position: absolute;
-    bottom: -10px;
-    left: 0;
-    width: 60px;
-    height: 3px;
-    background: var(--secondary);
-    border-radius: 3px;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid rgba(32, 201, 151, 0.3);
+    text-align: left;
+    width: 100%;
   }
 
   .activities-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 1.2rem;
-    margin-bottom: 3rem;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
   }
 
   .activity-item {
     background: var(--dark-tertiary);
+    padding: 1.5rem;
     border-radius: 10px;
-    padding: 1.2rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     text-align: center;
     transition: all 0.3s ease;
     opacity: 0;
-    transform: scale(0.9);
+    transform: translateY(20px);
     border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .activity-item.visible {
-    animation: popIn 0.5s forwards;
+    animation: fadeUp 0.5s forwards;
   }
 
   .activity-item:hover {
     transform: translateY(-5px);
     box-shadow: var(--shadow);
-    background: var(--primary);
-    border-color: transparent;
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
   .activity-icon {
     font-size: 2rem;
-    margin-bottom: 1rem;
     color: var(--secondary);
-    transition: color 0.3s ease;
-  }
-
-  .activity-item:hover .activity-icon {
-    color: white;
+    margin-bottom: 1rem;
   }
 
   .activity-year {
-    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--accent);
     margin-bottom: 0.5rem;
-    color: var(--text-secondary);
-    transition: color 0.3s ease;
-  }
-
-  .activity-item:hover .activity-year {
-    color: rgba(255, 255, 255, 0.9);
+    font-weight: 600;
   }
 
   .activity-title {
-    line-height: 1.4;
-    transition: color 0.3s ease;
+    color: var(--text);
+    font-weight: 500;
   }
 
   .qualifications-list {
@@ -972,36 +1275,31 @@
     font-weight: bold;
   }
 
-  /* Projects section */
+  /* Projects Section */
   .projects-container {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 2rem;
+    width: 100%;
   }
 
   .project-card {
     background: var(--dark-tertiary);
     border-radius: 12px;
-    overflow: hidden;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
     box-shadow: var(--shadow);
     transition: all 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.05);
     opacity: 0;
     transform: translateY(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .project-card.visible {
-    animation: fadeUp 0.6s forwards;
+    animation: fadeUp 0.5s forwards;
   }
 
   .project-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
     border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .project-content {
-    padding: 1.5rem;
   }
 
   .project-title {
@@ -1012,38 +1310,30 @@
 
   .project-description {
     margin-bottom: 1.5rem;
-    line-height: 1.6;
+    line-height: 1.7;
     color: var(--text-secondary);
   }
 
   .project-tech {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.7rem;
     margin-bottom: 1.5rem;
   }
 
-  /* Fortsetzung der tech-badge styles */
   .tech-badge {
-    background: rgba(93, 72, 227, 0.2);
-    color: var(--primary);
-    padding: 0.3rem 0.8rem;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    border: 1px solid rgba(93, 72, 227, 0.3);
-    transition: all 0.3s ease;
-  }
-
-  .tech-badge:hover {
     background: var(--primary);
     color: white;
-    border-color: transparent;
+    padding: 0.4rem 0.8rem;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
   .project-links {
     display: flex;
-    gap: 1rem;
     flex-wrap: wrap;
+    gap: 1rem;
   }
 
   .project-link {
@@ -1052,29 +1342,28 @@
     gap: 0.5rem;
     background: var(--dark);
     color: var(--text);
-    padding: 0.5rem 1rem;
+    padding: 0.6rem 1.2rem;
     border-radius: 20px;
     text-decoration: none;
-    font-size: 0.9rem;
     transition: all 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-weight: 500;
   }
 
   .project-link:hover {
-    background: var(--primary);
+    background: var(--accent);
     color: white;
-    transform: translateY(-2px);
-    border-color: transparent;
+    transform: translateY(-3px);
   }
 
-  /* Navigation Dots */
+  /* Navigation controls */
   .nav-dots {
     position: absolute;
-    bottom: 2rem;
+    bottom: calc(20px + var(--safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 0.5rem;
+    gap: 0.8rem;
+    z-index: 10;
   }
 
   .nav-dot {
@@ -1084,6 +1373,7 @@
     background: rgba(255, 255, 255, 0.3);
     cursor: pointer;
     transition: all 0.3s ease;
+    border: none;
   }
 
   .nav-dot.active {
@@ -1091,61 +1381,55 @@
     transform: scale(1.2);
   }
 
-  .nav-dot:hover {
-    background: var(--secondary);
-  }
-
-  /* Navigation Arrows */
   .nav-arrow {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
+    background: rgba(93, 72, 227, 0.2);
+    color: white;
     width: 50px;
     height: 50px;
     border-radius: 50%;
-    background: rgba(30, 30, 36, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--text);
-    font-size: 1.2rem;
     transition: all 0.3s ease;
     z-index: 10;
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
+  .nav-arrow:hover {
+    background: var(--primary);
+    transform: translateY(-50%) scale(1.1);
+  }
+
   .nav-prev {
-    left: 1.5rem;
+    left: 20px;
   }
 
   .nav-next {
-    right: 1.5rem;
-  }
-
-  .nav-arrow:hover {
-    background: var(--primary);
-    color: white;
-    transform: translateY(-50%) scale(1.1);
-    border-color: transparent;
+    right: 20px;
   }
 
   /* Chat Bubble */
   .chat-bubble {
     position: fixed;
-    bottom: 2rem;
-    right: 2rem;
+    bottom: calc(20px + var(--safe-area-inset-bottom));
+    right: 20px;
     width: 60px;
     height: 60px;
     border-radius: 50%;
     background: var(--primary);
+    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 5px 20px rgba(93, 72, 227, 0.4);
     cursor: pointer;
-    box-shadow: 0 5px 15px rgba(93, 72, 227, 0.3);
     z-index: 100;
     transition: all 0.3s ease;
+    border: none;
   }
 
   .chat-bubble:hover {
@@ -1154,11 +1438,11 @@
   }
 
   .chat-icon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
+    filter: brightness(0) invert(1);
   }
 
-  /* Chat Content */
   .chat-content {
     position: fixed;
     bottom: 8rem;
@@ -1241,21 +1525,10 @@
     }
   }
 
-  @keyframes popIn {
-    from {
-      opacity: 0;
-      transform: scale(0.9);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  /* Responsive Design */
+  /* Media Queries */
   @media (max-width: 768px) {
     .slide-title {
-      font-size: 2.2rem;
+      font-size: 2rem;
     }
 
     .slide-subtitle {
@@ -1265,15 +1538,17 @@
     .card {
       padding: 1.5rem;
       width: 95%;
+      max-height: 70vh;
+      max-height: calc(var(--vh, 1vh) * 100);
     }
 
     .profile-img {
-      width: 150px;
-      height: 150px;
+      width: 140px;
+      height: 140px;
     }
 
-    .activities-grid {
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    .profile-name {
+      font-size: 1.8rem;
     }
 
     .nav-arrow {
@@ -1281,12 +1556,17 @@
       height: 40px;
     }
 
-    .nav-prev {
-      left: 1rem;
+    .activities-grid {
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 1rem;
     }
 
-    .nav-next {
-      right: 1rem;
+    .activity-item {
+      padding: 1rem;
+    }
+
+    .timeline-item {
+      padding-left: 1.5rem;
     }
   }
 
@@ -1299,28 +1579,300 @@
       font-size: 1rem;
     }
 
-    .profile-name {
-      font-size: 1.8rem;
+    .card {
+      padding: 1rem;
     }
 
-    .profile-title {
-      font-size: 1rem;
+    .nav-arrow {
+      display: none;
     }
 
     .activities-grid {
       grid-template-columns: 1fr 1fr;
     }
+  }
 
-    .chat-bubble {
-      width: 50px;
-      height: 50px;
-      bottom: 1.5rem;
-      right: 1.5rem;
+  .skills-showcase {
+    min-height: 100vh;
+    background: var(--gradient);
+    padding: 4rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .showcase-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    color: var(--text);
+    position: relative;
+    z-index: 2;
+  }
+
+  .showcase-header h2 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to right, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .showcase-header p {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+  }
+
+  /* SVG connections */
+  .skills-connections {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .connection-path {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: flowPath 15s linear infinite;
+  }
+
+  @keyframes flowPath {
+    from {
+      stroke-dashoffset: 1000;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .skills-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2.5rem;
+    padding: 2rem;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .skill-card {
+    width: 100%;
+    height: 250px;
+    perspective: 1000px;
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    background: var(--dark-tertiary);
+  }
+
+  .skill-card:hover {
+    transform: rotate(0deg) scale(1.05) !important;
+    z-index: 10;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+  }
+
+  .skill-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+  }
+
+  .skill-card:hover .skill-card-inner {
+    transform: rotateY(180deg);
+  }
+
+  .skill-card-front,
+  .skill-card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .skill-card-front {
+    background: var(--dark-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .skill-card-front::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      135deg,
+      rgba(93, 72, 227, 0.2),
+      rgba(231, 70, 148, 0.2)
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .skill-card:hover .skill-card-front::after {
+    opacity: 1;
+  }
+
+  .skill-card-front img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: all 0.5s ease;
+  }
+
+  .skill-card:hover .skill-card-front img {
+    transform: scale(1.1);
+  }
+
+  .card-icon {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .card-icon i {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    font-size: 2rem;
+    color: rgba(255, 255, 255, 0.8);
+    z-index: 2;
+    filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.5));
+  }
+
+  .skill-card-back {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+    transform: rotateY(180deg);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 1.5rem;
+    backface-visibility: hidden;
+    position: relative;
+    z-index: 2;
+  }
+
+  .skill-card-back::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="none" width="100" height="100"/><path d="M0,0 L100,100 M0,50 L50,100 M50,0 L100,50" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></svg>');
+    opacity: 0.3;
+  }
+
+  .skill-card-back h3 {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .skill-card-back p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* Add subtle glow effect */
+  @keyframes glow {
+    0%,
+    100% {
+      box-shadow: 0 0 15px rgba(93, 72, 227, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 25px rgba(231, 70, 148, 0.5);
+    }
+  }
+
+  .skill-card {
+    animation: glow 5s ease-in-out infinite;
+    animation-delay: calc(var(--order) * 1s);
+  }
+
+  .skill-card:nth-child(1) {
+    --order: 0;
+  }
+  .skill-card:nth-child(2) {
+    --order: 1;
+  }
+  .skill-card:nth-child(3) {
+    --order: 2;
+  }
+  .skill-card:nth-child(4) {
+    --order: 3;
+  }
+  .skill-card:nth-child(5) {
+    --order: 4;
+  }
+  .skill-card:nth-child(6) {
+    --order: 5;
+  }
+
+  @media (max-width: 992px) {
+    .skills-cards-container {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .showcase-header h2 {
+      font-size: 2rem;
     }
 
-    .chat-content {
-      width: 250px;
-      right: 1.5rem;
+    .showcase-header p {
+      font-size: 1rem;
+    }
+
+    .skills-cards-container {
+      gap: 1.5rem;
+    }
+
+    .skill-card {
+      height: 220px;
+    }
+
+    .skill-card-back h3 {
+      font-size: 1.5rem;
+    }
+
+    .skill-card-back p {
+      font-size: 1rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .skills-cards-container {
+      grid-template-columns: 1fr;
+      max-width: 500px;
+    }
+
+    .skill-card {
+      height: 300px;
+      transform: rotate(0deg) !important;
+    }
+
+    .skill-card-inner {
+      transform: none !important;
     }
   }
 </style>
